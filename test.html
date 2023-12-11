@@ -10,6 +10,7 @@
         body {
             margin: 0;
         }
+
         canvas {
             display: block;
         }
@@ -79,33 +80,68 @@
             const positionBuffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-            // Define the parametrization function for the Breather surface
-            function breatherSurface(u, v) {
-                const aa = 0.8; // Replace with your desired values
-                const wsqr = 1 - aa * aa;
-                const w = Math.sqrt(wsqr);
-                const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
+            function createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa) {
+                // Create an empty array to store the vertices.
+                const verticesBreathable = [];
 
-                const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
-                const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
-                const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
+                // Loop over the u and v variables.
+                for (let u = uRange[0]; u <= uRange[1]; u += uPrecision) {
+                    for (let v = vRange[0]; v <= vRange[1]; v += vPrecision) {
+                        // Calculate the denominator.
+                        const wsqr = 1 - aa * aa;
+                        const w = Math.sqrt(wsqr);
+                        const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
+    
+                        const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
+                        const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
+                        const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
 
-                return vec4(x, y, z, 1.0);
-            }
-
-            const vertices = [];
-            const numPointsU = 1000;
-            const numPointsV = 1000;
-
-            for (let i = 0; i < numPointsU; i++) {
-                for (let j = 0; j < numPointsV; j++) {
-                    const u = (i / (numPointsU - 1)) * 4 - 2; // Adjust the range as needed
-                    const v = (j / (numPointsV - 1)) * Math.PI * 2;
-
-                    const point = breatherSurface(u, v);
-                    vertices.push(point);
+                        // Add the vertex to the array.
+                        verticesBreathable.push(vec4(x, y, z, 1.0));
+                    }
                 }
+
+                // Return the array of vertices.
+                return verticesBreathable;
             }
+
+
+            function generateBreatherShape(aa) {
+                function breatherSurface(u, v) {
+                    const wsqr = 1 - aa * aa;
+                    const w = Math.sqrt(wsqr);
+                    const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
+
+                    const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
+                    const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
+                    const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
+
+                    return vec4(x, y, z, 1.0);
+                }
+
+                const verticesBreather = [];
+                const numPointsU = 1000;
+                const numPointsV = 1000;
+
+                for (let i = 0; i < numPointsU; i++) {
+                    for (let j = 0; j < numPointsV; j++) {
+                        const u = (i / (numPointsU - 1)) * 4 - 2; // Adjust the range as needed
+                        const v = (j / (numPointsV - 1)) * Math.PI * 2;
+
+                        const point = breatherSurface(u, v);
+                        verticesBreather.push(point);
+                    }
+                }
+
+                return verticesBreather;
+            }
+            const uRange = [0, 20];
+            const vRange = [0, 20];
+            const uPrecision = 0.05;
+            const vPrecision = 0.05;
+            const aa = 0.45;
+            const vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
+            <!-- var vertices = structuredClone(generateBreatherShape(0.76)); -->
 
             gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
 
@@ -123,14 +159,14 @@
 
             // Set up the perspective matrix
             var projectionMatrix = mat4();
-            projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100);
+            projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 500);
 
             // Set up the model-view matrix
             var modelViewMatrix = mat4();
-            modelViewMatrix = lookAt(vec3(0, 0, -100), vec3(0, 0, 0), vec3(0, 1, 0));
+            modelViewMatrix = lookAt(vec3(0, 0, -400), vec3(0, 0, 0), vec3(0, 1, 0));
 
             var matrix = mat4();
-            matrix = mult( projectionMatrix, modelViewMatrix);
+            matrix = mult(projectionMatrix, modelViewMatrix);
 
             // Set up the perspective matrix
             const matrixLocation = gl.getUniformLocation(program, "u_matrix");
