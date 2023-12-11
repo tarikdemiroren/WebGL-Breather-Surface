@@ -5,8 +5,8 @@ document.addEventListener("DOMContentLoaded", function () {
     let vRangeStart;
     let vRangeEnd;
 
-    let uRange = [];
-    let vRange = [];
+    let uRange = [0, 20];
+    let vRange = [0 , 20];
     let uPrecision = 0.05;
     let vPrecision = 0.05;
     let aa = 0.5;
@@ -19,32 +19,32 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("uPrecision").addEventListener("input", function () {
         uPrecision = this.value;
         uPrecisionValueSpan.textContent = `${uPrecision}`;
-      });
+    });
 
-    
-      const vPrecisionValueSpan = document.getElementById('vPrecisionValue');
-      vPrecisionValueSpan.textContent = `${vPrecision}`;
 
-      document.getElementById("vPrecision").addEventListener("input", function () {
+    const vPrecisionValueSpan = document.getElementById('vPrecisionValue');
+    vPrecisionValueSpan.textContent = `${vPrecision}`;
+
+    document.getElementById("vPrecision").addEventListener("input", function () {
         vPrecision = this.value;
         vPrecisionValueSpan.textContent = `${vPrecision}`;
-      });
+    });
 
-      const aaPrecisionValueSpan = document.getElementById('aaPrecisionValue');
+    const aaPrecisionValueSpan = document.getElementById('aaPrecisionValue');
     aaPrecisionValueSpan.textContent = `${aa}`;
 
-      document.getElementById("aaValue").addEventListener("input", function () {
+    document.getElementById("aaValue").addEventListener("input", function () {
         aa = this.value;
         aaPrecisionValueSpan.textContent = `${aa}`;
-      });
+    });
 
     function getNumbers() {
         const uRangeStartInput = document.getElementById("uRangeStart").value;
         const uRangeEndInput = document.getElementById("uRangeEnd").value;
         const vRangeStartInput = document.getElementById("vRangeStart").value;
         const vRangeEndInput = document.getElementById("vRangeEnd").value;
-      
-      
+
+
         // Convert inputs to integers
         uRangeStart = parseInt(uRangeStartInput);
         uRangeEnd = parseInt(uRangeEndInput);
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         uRange = [uRangeStart, uRangeEnd];
         vRange = [vRangeStart, vRangeEnd];
-      }
+    }
 
     const canvas = document.getElementById("webgl-canvas");
     const gl = canvas.getContext("webgl");
@@ -139,39 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return verticesBreathable;
     }
 
-
-    function generateBreatherShape(aa) {
-        function breatherSurface(u, v) {
-            const wsqr = 1 - aa * aa;
-            const w = Math.sqrt(wsqr);
-            const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
-
-            const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
-            const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
-            const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
-
-            return vec4(x, y, z, 1.0);
-        }
-
-        const verticesBreather = [];
-        const numPointsU = 1000;
-        const numPointsV = 1000;
-
-        for (let i = 0; i < numPointsU; i++) {
-            for (let j = 0; j < numPointsV; j++) {
-                const u = (i / (numPointsU - 1)) * 4 - 2; // Adjust the range as needed
-                const v = (j / (numPointsV - 1)) * Math.PI * 2;
-
-                const point = breatherSurface(u, v);
-                verticesBreather.push(point);
-            }
-        }
-
-        return verticesBreather;
-    }
-
-    const vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
-    // <!-- var vertices = structuredClone(generateBreatherShape(0.76)); -->
+    let vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
 
     gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
 
@@ -180,20 +148,15 @@ document.addEventListener("DOMContentLoaded", function () {
     gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(positionAttribLocation);
 
-    // Set the WebGL rendering context clear color
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    // Clear the color buffer with specified clear color
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
     gl.enable(gl.DEPTH_TEST);
 
     // Set up the perspective matrix
     var projectionMatrix = mat4();
-    projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 500);
+    projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 10000);
 
     // Set up the model-view matrix
     var modelViewMatrix = mat4();
-    modelViewMatrix = lookAt(vec3(0, 0, -400), vec3(0, 0, 0), vec3(0, 1, 0));
+    modelViewMatrix = lookAt(vec3(0, 0, -1000), vec3(0, 0, 0), vec3(0, 1, 0));
 
     var matrix = mat4();
     matrix = mult(projectionMatrix, modelViewMatrix);
@@ -203,6 +166,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
     gl.uniformMatrix4fv(matrixLocation, false, flatten(matrix));
 
-    // Draw the vertices
-    gl.drawArrays(gl.POINTS, 0, vertices.length / 4);
+    render();
+
+    function render() {
+        // Set the WebGL rendering context clear color
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        // Clear the color buffer with specified clear color
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        // console.log(`uRange: ${uRange} vRange: ${vRange}, uPrecision: ${uPrecision} vPrecision: ${vPrecision} aa: ${aa}`);
+        vertices = structuredClone(createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa));
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
+        gl.drawArrays(gl.POINTS, 0, vertices.length / 4);
+        requestAnimationFrame(render)
+    }
 });
