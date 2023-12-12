@@ -5,8 +5,10 @@ document.addEventListener("DOMContentLoaded", function () {
     let vRangeStart;
     let vRangeEnd;
 
-    let uRange = [0, 20];
-    let vRange = [0 , 20];
+    let changed = false;
+
+    let uRange = [0, 16];
+    let vRange = [0 , 23];
     let uPrecision = 0.05;
     let vPrecision = 0.05;
     let aa = 0.5;
@@ -19,6 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("uPrecision").addEventListener("input", function () {
         uPrecision = this.value;
         uPrecisionValueSpan.textContent = `${uPrecision}`;
+        changed = true;
     });
 
 
@@ -28,6 +31,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("vPrecision").addEventListener("input", function () {
         vPrecision = this.value;
         vPrecisionValueSpan.textContent = `${vPrecision}`;
+        changed = true;
     });
 
     const aaPrecisionValueSpan = document.getElementById('aaPrecisionValue');
@@ -36,6 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("aaValue").addEventListener("input", function () {
         aa = this.value;
         aaPrecisionValueSpan.textContent = `${aa}`;
+        changed = true;
     });
 
     function getNumbers() {
@@ -44,8 +49,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const vRangeStartInput = document.getElementById("vRangeStart").value;
         const vRangeEndInput = document.getElementById("vRangeEnd").value;
 
-
-        // Convert inputs to integers
         uRangeStart = parseInt(uRangeStartInput);
         uRangeEnd = parseInt(uRangeEndInput);
         vRangeStart = parseInt(vRangeStartInput);
@@ -53,6 +56,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         uRange = [uRangeStart, uRangeEnd];
         vRange = [vRangeStart, vRangeEnd];
+
+        changed = true;
     }
 
     const canvas = document.getElementById("webgl-canvas");
@@ -175,9 +180,12 @@ document.addEventListener("DOMContentLoaded", function () {
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         // console.log(`uRange: ${uRange} vRange: ${vRange}, uPrecision: ${uPrecision} vPrecision: ${vPrecision} aa: ${aa}`);
-        vertices = structuredClone(createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa));
-        gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
-        gl.drawArrays(gl.POINTS, 0, vertices.length / 4);
+        if (changed){
+            vertices = structuredClone(createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa));
+            gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
+        }
+        changed = false;
+        gl.drawArrays(gl.POINTS, 0, vertices.length/3);
         requestAnimationFrame(render)
     }
 });
