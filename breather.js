@@ -1,4 +1,56 @@
+
+
 document.addEventListener("DOMContentLoaded", function () {
+
+    // Variables to track the initial mouse position
+let startMouseX = 0;
+let startMouseY = 0;
+
+// Variables to track the accumulated rotation angles
+let totalRotationX = 0;
+let totalRotationY = 0;
+
+var isMouseDown = false;
+
+// Event handlers
+function onMouseDown(event) {
+    isMouseDown = true;
+
+    startMouseX = event.clientX;
+    startMouseY = event.clientY;
+}
+
+function onMouseMove(event) {
+
+    if(isMouseDown) {
+        const deltaX = event.clientX - canvas.getBoundingClientRect().left - startMouseX;
+        const deltaY = event.clientY - canvas.getBoundingClientRect().top - startMouseY;
+    
+        // Sensitivity factor to control rotation speed
+        const sensitivity = 0.2;
+    
+        // Calculate rotation angles
+        const rotationX = -deltaY * sensitivity;
+        const rotationY = -deltaX * sensitivity;
+    
+        // Update total rotation angles
+        totalRotationX = rotationX;
+        totalRotationY = rotationY;
+
+        console.log(totalRotationX, totalRotationY);
+    }
+}
+
+function onMouseUp(event) {
+    isMouseDown = false;
+    totalRotationX = 0;
+    totalRotationY = 0;
+}
+
+// Attach event listeners
+document.addEventListener('mousedown', onMouseDown);
+document.addEventListener('mousemove', onMouseMove);
+document.addEventListener('mouseup', onMouseUp);
 
     let uRangeStart;
     let uRangeEnd;
@@ -8,7 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let changed = false;
 
     let uRange = [0, 16];
-    let vRange = [0 , 23];
+    let vRange = [0, 23];
     let uPrecision = 0.05;
     let vPrecision = 0.05;
     let aa = 0.5;
@@ -161,13 +213,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Set up the model-view matrix
     var modelViewMatrix = mat4();
-    modelViewMatrix = lookAt(vec3(0, 0, -1000), vec3(0, 0, 0), vec3(0, 1, 0));
+    modelViewMatrix = lookAt(vec3(0, 0, -200), vec3(0, 0, 0), vec3(0, 1, 0));
 
     var matrix = mat4();
     matrix = mult(projectionMatrix, modelViewMatrix);
 
     // Set up the perspective matrix
-    const matrixLocation = gl.getUniformLocation(program, "u_matrix");
+    var matrixLocation = gl.getUniformLocation(program, "u_matrix");
 
     gl.uniformMatrix4fv(matrixLocation, false, flatten(matrix));
 
@@ -180,12 +232,20 @@ document.addEventListener("DOMContentLoaded", function () {
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         // console.log(`uRange: ${uRange} vRange: ${vRange}, uPrecision: ${uPrecision} vPrecision: ${vPrecision} aa: ${aa}`);
-        if (changed){
+        if (changed) {
             vertices = structuredClone(createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa));
             gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
         }
+
+        // modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationX * (Math.PI / 180), [1, 0, 0]));
+        modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationY * (Math.PI / 180), [0, 1, 0]));
+        matrix = mult(projectionMatrix, modelViewMatrix);
+
+        matrixLocation = gl.getUniformLocation(program, "u_matrix");
+        gl.uniformMatrix4fv(matrixLocation, false, flatten(matrix));
+
         changed = false;
-        gl.drawArrays(gl.POINTS, 0, vertices.length/3);
+        gl.drawArrays(gl.LINES, 0, vertices.length );
         requestAnimationFrame(render)
     }
 });
