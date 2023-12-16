@@ -61,8 +61,8 @@ document.addEventListener('mouseup', onMouseUp);
 
     let uRange = [0, 16];
     let vRange = [0, 23];
-    let uPrecision = 0.05;
-    let vPrecision = 0.05;
+    let uPrecision = 0.2;
+    let vPrecision = 0.2;
     let aa = 0.5;
 
     document.getElementById("button").addEventListener("click", getNumbers);
@@ -112,6 +112,16 @@ document.addEventListener('mouseup', onMouseUp);
         changed = true;
     }
 
+    var zoomCoefficient = 600;
+
+    document.getElementById("buttonIn").addEventListener("click", function () {
+        zoomCoefficient -= 10;
+    });
+
+    document.getElementById("buttonOut").addEventListener("click", function () {
+        zoomCoefficient += 10;
+    });
+
     const canvas = document.getElementById("webgl-canvas");
     const gl = canvas.getContext("webgl");
 
@@ -119,6 +129,8 @@ document.addEventListener('mouseup', onMouseUp);
         console.error("Unable to initialize WebGL. Your browser may not support it.");
         return;
     }
+
+    var length_of_strip;
 
     // Vertex and fragment shader source code
     const vertexShaderSource = `
@@ -171,14 +183,32 @@ document.addEventListener('mouseup', onMouseUp);
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
+    function quad(pointsArray, a, b, c, d) {
+        var t1 = subtract(b, a);
+        var t2 = subtract(c, b);
+        var normal = cross(t1, t2);
+        var normal = vec3(normal);
+      
+        pointsArray.push(a);
+        // normalsArray.push(normal);
+        pointsArray.push(b);
+        // normalsArray.push(normal);
+        pointsArray.push(c);
+        // normalsArray.push(normal);
+        pointsArray.push(d);
+        // normalsArray.push(normal);
+      }
+
     function createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa) {
         // Create an empty array to store the vertices.
-        const verticesBreathable = [];
+        const verticesBreathable1 = [];
+        const verticesBreathable2 = [];
 
-        // Loop over the u and v variables.
+        const totalVertices = [];
+        var chose = 1;
+
         for (let u = uRange[0]; u <= uRange[1]; u += uPrecision) {
             for (let v = vRange[0]; v <= vRange[1]; v += vPrecision) {
-                // Calculate the denominator.
                 const wsqr = 1 - aa * aa;
                 const w = Math.sqrt(wsqr);
                 const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
@@ -187,13 +217,40 @@ document.addEventListener('mouseup', onMouseUp);
                 const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
                 const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
 
-                // Add the vertex to the array.
-                verticesBreathable.push(vec4(x, y, z, 1.0));
+                if (chose % 3 == 1){
+                    verticesBreathable1.push(vec4(x, y, z, 1.0));
+                }
+                else if (chose % 3 == 2){
+                    verticesBreathable2.push(vec4(x, y, z, 1.0));
+                }
+            }
+            chose++;
+            if (chose % 3 == 0){
+                u -= vPrecision;
+                if (length_of_strip === undefined){
+                    length_of_strip = verticesBreathable1.length;
+                }
+                // else if (u != uRange[1] - uPrecision) {
+                //     u -= vPrecision;
+                //     // for (var j = 0; j < length_of_strip; j++){
+                //     //     var k = verticesBreathable1[j];
+                //     //     var l = totalVertices[ (totalVertices.length - (2*length_of_strip)) + j + (j + 1) ]
+                //     //     totalVertices.push(k);
+                //     //     totalVertices.push(l);
+                //     // }
+                // }
+                for (var i = 0; i < verticesBreathable1.length; i++){
+                    var a = verticesBreathable1.shift();
+                    var b = verticesBreathable2.shift();
+                    totalVertices.push( a );
+                    totalVertices.push( b );
+                }
+                chose++;
             }
         }
+        length_of_strip = undefined;
 
-        // Return the array of vertices.
-        return verticesBreathable;
+        return totalVertices;
     }
 
     let vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
@@ -213,7 +270,7 @@ document.addEventListener('mouseup', onMouseUp);
 
     // Set up the model-view matrix
     var modelViewMatrix = mat4();
-    modelViewMatrix = lookAt(vec3(0, 0, -200), vec3(0, 0, 0), vec3(0, 1, 0));
+    modelViewMatrix = lookAt(vec3(0, 0, -(zoomCoefficient)), vec3(0, 0, 0), vec3(0, 1, 0));
 
     var matrix = mat4();
     matrix = mult(projectionMatrix, modelViewMatrix);
@@ -232,13 +289,17 @@ document.addEventListener('mouseup', onMouseUp);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         // console.log(`uRange: ${uRange} vRange: ${vRange}, uPrecision: ${uPrecision} vPrecision: ${vPrecision} aa: ${aa}`);
+
         if (changed) {
             vertices = structuredClone(createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa));
             gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
         }
 
         // modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationX * (Math.PI / 180), [1, 0, 0]));
+
+        modelViewMatrix[2][3] = -(zoomCoefficient);
         modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationY * (Math.PI / 180), [0, 1, 0]));
+
         matrix = mult(projectionMatrix, modelViewMatrix);
 
         matrixLocation = gl.getUniformLocation(program, "u_matrix");

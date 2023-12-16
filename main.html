@@ -74,17 +74,22 @@
         <br>
 
         <label for="uPrecision" class="form-label">U Precision: <span id="uPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="uPrecision" min="0.01" max="1" step="0.01" value="0.05">
+        <input type="range" class="form-range" id="uPrecision" min="0.00" max="1" step="0.05" value="0.2">
 
         <br>
 
         <label for="vPrecision" class="form-label">V Precision: <span id="vPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="vPrecision" min="0.01" max="1" step="0.01" value="0.05">
+        <input type="range" class="form-range" id="vPrecision" min="0.01" max="1" step="0.01" value="0.2">
 
         <br>
 
         <label for="aaValue" class="form-label">Double A Value: <span id="aaPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="aaValue" min="0.1" max="0.999" step="0.001" value="0.5">
+        <input type="range" class="form-range" id="aaValue" min="0.1" max="0.999" step="0.01" value="0.5">
+
+        <br>
+
+        <button id="buttonIn">Zoom In</button>
+        <button id="buttonOut">Zoom Out</button>
     </div>
 </body>
 
