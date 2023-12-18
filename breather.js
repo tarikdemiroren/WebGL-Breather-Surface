@@ -1,4 +1,14 @@
+const WIREFRAME_MODE = 2;
+const GOURAUD_MODE = 0;
+const PHONG_MODE = 1;
+
 document.addEventListener("DOMContentLoaded", function () {
+
+    const canvas = document.getElementById("webgl-canvas");
+
+    let canvasBounds = canvas.getBoundingClientRect()
+
+    let shadingMode = GOURAUD_MODE;
 
     // Variables to track the initial mouse position
     let startMouseX = 0;
@@ -12,10 +22,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Event handlers
     function onMouseDown(event) {
-        isMouseDown = true;
 
-        startMouseX = event.clientX;
-        startMouseY = event.clientY;
+        if(event.clientX >= canvasBounds.left && event.clientX <= canvasBounds.right) {
+            isMouseDown = true;
+            startMouseX = event.clientX;
+            startMouseY = event.clientY;
+        }
     }
 
     function onMouseMove(event) {
@@ -57,9 +69,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let uRange = [-16, 16];
     let vRange = [-23, 23];
-    let uPrecision = 0.05;
-    let vPrecision = 0.05;
+    let uPrecision = 0.2;
+    let vPrecision = 0.2;
     let aa = 0.5;
+    let zoomFactor = 600;
 
     document.getElementById("button").addEventListener("click", getNumbers);
 
@@ -67,7 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
     uPrecisionValueSpan.textContent = `${uPrecision}`;
 
     document.getElementById("uPrecision").addEventListener("input", function () {
-        uPrecision = this.value;
+        uPrecision =  parseFloat(this.value);
         uPrecisionValueSpan.textContent = `${uPrecision}`;
         changed = true;
     });
@@ -77,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
     vPrecisionValueSpan.textContent = `${vPrecision}`;
 
     document.getElementById("vPrecision").addEventListener("input", function () {
-        vPrecision = this.value;
+        vPrecision =  parseFloat(this.value);
         vPrecisionValueSpan.textContent = `${vPrecision}`;
         changed = true;
     });
@@ -89,6 +102,14 @@ document.addEventListener("DOMContentLoaded", function () {
         aa = this.value;
         aaPrecisionValueSpan.textContent = `${aa}`;
         changed = true;
+    });
+
+    const zoomSpan = document.getElementById('zoomSpan');
+    zoomSpan.textContent = `${zoomFactor}`;
+
+    document.getElementById("zoomSlider").addEventListener("input", function () {
+        zoomFactor = this.value;
+        zoomSpan.textContent = `${zoomFactor}`;
     });
 
     function getNumbers() {
@@ -108,17 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
         changed = true;
     }
 
-    var zoomCoefficient = 600;
-
-    document.getElementById("buttonIn").addEventListener("click", function () {
-        zoomCoefficient -= 10;
-    });
-
-    document.getElementById("buttonOut").addEventListener("click", function () {
-        zoomCoefficient += 10;
-    });
-
-    const canvas = document.getElementById("webgl-canvas");
+    
     const gl = canvas.getContext("webgl");
 
     if (!gl) {
@@ -129,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var length_of_strip;
 
     // Vertex and fragment shader source code
-    const vertexShaderSource = `
+    const gouraudVertexShaderSource = `
         attribute vec4 vPosition;
         attribute vec4 vNormal;
 
@@ -180,16 +191,83 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     `;
 
-    const fragmentShaderSource = `
+    const gouraudFragmentShaderSource = `
         precision mediump float;
 
         varying vec4 fColor;
+        uniform bool wireframeMode;
 
         void main() {
             
-            gl_FragColor = fColor;
+            if(wireframeMode == true) {
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+            else {
+                gl_FragColor = fColor;
+            }
+            
         }
     `;
+
+
+    const phongVertexShaderSource = `
+    attribute vec4 vPosition;
+    attribute vec4 vNormal;
+    varying vec3 N, L, E;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform vec4 lightPosition;
+    uniform mat3 normalMatrix;
+
+    void main() {
+        vec3 light = lightPosition.xyz;
+
+        vec3 pos = -(modelViewMatrix * vPosition).xyz;
+
+        if (lightPosition.w == 0.0){
+            L = normalize(lightPosition.xyz);
+        }
+        else {
+            L = normalize(light - pos);
+        }
+
+        vec3 E = -normalize( pos );
+        vec3 N = normalize( normalMatrix * vNormal.xyz );
+
+        gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+    }
+`;
+
+const phongFragmentShaderSource = `
+precision mediump float;
+
+uniform vec4 ambientProduct;
+uniform vec4 diffuseProduct;
+uniform vec4 specularProduct;
+uniform float shininess;
+varying vec3 N, L, E;
+
+void main() {
+    vec4 fColor;
+    
+    vec3 H = normalize( L + E );
+    vec4 ambient = ambientProduct;
+
+    float Kd = max( dot(L, N), 0.0 );
+    vec4  diffuse = Kd*diffuseProduct;
+
+    float Ks = pow( max(dot(N, H), 0.0), shininess );
+    vec4  specular = Ks * specularProduct;
+    
+    if( dot(L, N) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+
+    fColor = ambient + diffuse +specular;
+    fColor.a = 1.0;
+
+    gl_FragColor = fColor; 
+    }
+`;
 
     // Compile shaders
     function compileShader(type, source) {
@@ -206,11 +284,11 @@ document.addEventListener("DOMContentLoaded", function () {
         return shader;
     }
 
-    const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
-    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+    let vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
+    let fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
 
     // Link shaders into a program
-    const program = gl.createProgram();
+    let program = gl.createProgram();
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
@@ -219,6 +297,65 @@ document.addEventListener("DOMContentLoaded", function () {
         console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
         return;
     }
+
+    document.getElementById("wireframeButton").onclick = function(){
+
+        if(shadingMode == PHONG_MODE) {
+            vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
+            fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+    
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
+            return;
+        }
+
+        shadingMode = WIREFRAME_MODE
+    };
+    document.getElementById("gouraudButton").onclick = function(){
+
+        if(shadingMode == PHONG_MODE) {
+            vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
+            fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+    
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
+            return;
+        }
+
+        shadingMode = GOURAUD_MODE
+    };
+    document.getElementById("phongButton").onclick = function(){
+
+        if(shadingMode != PHONG_MODE) {
+            vertexShader =  vertexShader = compileShader(gl.VERTEX_SHADER, phongVertexShaderSource);
+            fragmentShader = compileShader(gl.FRAGMENT_SHADER, phongFragmentShaderSource);
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+    
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
+            return;
+        }
+
+        shadingMode = PHONG_MODE
+    };
+
 
     gl.enable(gl.DEPTH_TEST);
 
@@ -278,7 +415,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const sebnormals = [];
         var chose = 1;
 
+        console.log(uPrecision);
+        var errorTest = []
+
         for (let u = uRange[0]; u <= uRange[1]; u += uPrecision) {
+            errorTest.push(u);
             for (let v = vRange[0]; v <= vRange[1]; v += vPrecision) {
                 const wsqr = 1 - aa * aa;
                 const w = Math.sqrt(wsqr);
@@ -349,6 +490,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var normal = normalize(cross(t2, t1));
             normal = vec4(normal);
             normal[3] = 0.0;
+            // normal = reverseNormal(normal);
 
             sebnormals.push(normal);
             sebnormals.push(normal);
@@ -359,6 +501,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var normal = normalize(cross(t2, t1));
             normal = vec4(normal);
             normal[3] = 0.0;
+            // normal = reverseNormal(normal);
 
             sebnormals.push(normal);
             sebnormals.push(normal);
@@ -399,6 +542,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         normalsArray = (sebnormals);
 
+        // console.log(normalsArray);
+        console.log(errorTest);
 
 
         return sebvertices;
@@ -429,7 +574,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Set up the model-view matrix
     var modelViewMatrix = mat4();
-    modelViewMatrix = lookAt(vec3(0, 0, -(zoomCoefficient)), vec3(0, 0, 0), vec3(0, 1, 0));
+    modelViewMatrix = lookAt(vec3(0, 0, -(zoomFactor)), vec3(0, 0, 0), vec3(0, 1, 0));
 
     // Set up the perspective matrix
     var modelviewmatrixLocation = gl.getUniformLocation(program, "modelViewMatrix");
@@ -469,6 +614,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var diffuseColorLoc = gl.getUniformLocation(program, "diffuseProduct");
     var specularColorLoc = gl.getUniformLocation(program, "specularProduct");
     var shininessLoc = gl.getUniformLocation(program, "shininess");
+    var wireframeModeLoc = gl.getUniformLocation(program, "wireframeMode");
 
     gl.uniform4fv(lightPositionLoc, flatten(lightPosition));
     gl.uniform4fv(ambientColorLoc, flatten(ambientProduct));
@@ -496,7 +642,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationX * (Math.PI / 180), [1, 0, 0]));
 
-        modelViewMatrix[2][3] = -(zoomCoefficient);
+        modelViewMatrix[2][3] = -(zoomFactor);
         modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationY * (Math.PI / 180), [0, 1, 0]));
 
         //var modelviewmatrixLocation = gl.getUniformLocation(program, "modelViewMatrix");
@@ -508,7 +654,17 @@ document.addEventListener("DOMContentLoaded", function () {
         // gl.uniformMatrix4fv(projectionmatrixLocation, false, flatten(projectionMatrix));
 
         changed = false;
-        gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
+
+        if(shadingMode == WIREFRAME_MODE) {
+            gl.uniform1f(wireframeModeLoc, true);
+            gl.drawArrays(gl.LINE_STRIP, 0, vertices.length);
+        }
+        else {
+            gl.uniform1f(wireframeModeLoc, false);
+            gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
+        }
+        
+
         requestAnimationFrame(render)
     }
 });

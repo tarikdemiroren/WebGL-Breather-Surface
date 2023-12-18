@@ -38,15 +38,30 @@
             display: block;
             margin-bottom: 4px;
         }
+
+        #buttonContainer {
+            display: flex;
+            flex-direction: row;
+        }
+
+        .slider {
+            width: 150px;
+        }
     </style>
 </head>
 
 <body>
     <div id="canvas-container">
-        <canvas id="webgl-canvas" width="800" height="800"></canvas>
+        <canvas id="webgl-canvas" width="1000" height="800"></canvas>
     </div>
 
     <div id="input-container">
+        <div id="buttonContainer">
+            <button id="wireframeButton">Wireframe</button>
+            <button id="gouraudButton">Gouraud</button>
+            <button id="phongButton">Phong</button>
+        </div>
+
         <label for="uRangeStart">Enter U-Range start:</label>
         <input type="number" id="uRangeStart" name="uRangeStart" min="-50" max="50" value="-16">
 
@@ -74,22 +89,24 @@
         <br>
 
         <label for="uPrecision" class="form-label">U Precision: <span id="uPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="uPrecision" min="0.00" max="1" step="0.1" value="0.2">
+        <input type="range" class="form-range slider" id="uPrecision" min="0.05" max="1" step="0.05" value="0.2">
 
         <br>
 
         <label for="vPrecision" class="form-label">V Precision: <span id="vPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="vPrecision" min="0.00" max="1" step="0.1" value="0.2">
+        <input type="range" class="form-range slider" id="vPrecision" min="0.05" max="1" step="0.05" value="0.2">
 
         <br>
 
         <label for="aaValue" class="form-label">Double A Value: <span id="aaPrecisionValue"></span></label>
-        <input type="range" class="form-range" id="aaValue" min="0.1" max="0.999" step="0.01" value="0.5">
+        <input type="range" class="form-range slider" id="aaValue" min="0.1" max="0.999" step="0.01" value="0.5">
 
         <br>
 
-        <button id="buttonIn">Zoom In</button>
-        <button id="buttonOut">Zoom Out</button>
+        <label for="zoomSlider" class="form-label">Zoom <span id="zoomSpan"></span></label>
+        <input type="range" class="form-range slider" id="zoomSlider" min="200" max="1200" step="50" value="600">
+
+        <br>
     </div>
 </body>
 
