@@ -359,6 +359,8 @@ void main() {
 
     gl.enable(gl.DEPTH_TEST);
 
+
+
     gl.useProgram(program);
 
     let normalsArray = [];
@@ -594,7 +596,7 @@ void main() {
 
     // Set up the perspective matrix
     var projectionMatrix = mat4();
-    projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 10000);
+    projectionMatrix = perspective(Math.PI / 4, canvas.width / canvas.height, 4, 1000);
 
     // Set up the model-view matrix
     var modelViewMatrix = mat4();
@@ -687,7 +689,6 @@ void main() {
             gl.uniform1f(wireframeModeLoc, false);
             gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
         }
-
 
         requestAnimationFrame(render)
     }
