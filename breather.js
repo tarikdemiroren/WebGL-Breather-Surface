@@ -621,15 +621,15 @@ void main() {
 
     gl.uniformMatrix3fv(normalMatrixLocation, false, flatten(normalMatrix));
 
-    var lightPosition = vec4(0.0, 60.0, 60.0, 0.0);
+    var lightPosition = vec4(0.0, 10.0, 0.0, 0.0);
     var lightAmbient = vec4(0.4, 0.4, 0.4, 1.0);
     var lightDiffuse = vec4(0.7, 0.7, 0.7, 1.0);
-    var lightSpecular = vec4(0.2, 0.3, 0.2, 1.0);
+    var lightSpecular = vec4(1.0, 1.0, 1.0, 1.0);
 
-    var materialAmbient = vec4(0.0, 0.0, 1.0, 1.0);
-    var materialDiffuse = vec4(0.0, 0.0, 1.0, 1.0);
+    var materialAmbient = vec4(1.0, 0.0, 0.0, 1.0);
+    var materialDiffuse = vec4(1.0, 0.0, 0.0, 1.0);
     var materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
-    var materialShininess = 4.0;
+    var materialShininess = 100.0;
 
     var ambientProduct = mult(lightAmbient, materialAmbient);
     var diffuseProduct = mult(lightDiffuse, materialDiffuse);
@@ -647,7 +647,7 @@ void main() {
     gl.uniform4fv(diffuseColorLoc, flatten(diffuseProduct));
     gl.uniform4fv(specularColorLoc, flatten(specularProduct));
     gl.uniform1f(shininessLoc, materialShininess);
-
+    
     render();
 
     function render() {
