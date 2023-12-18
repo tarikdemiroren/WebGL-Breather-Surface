@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Event handlers
     function onMouseDown(event) {
 
-        if(event.clientX >= canvasBounds.left && event.clientX <= canvasBounds.right) {
+        if (event.clientX >= canvasBounds.left && event.clientX <= canvasBounds.right) {
             isMouseDown = true;
             startMouseX = event.clientX;
             startMouseY = event.clientY;
@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", function () {
     uPrecisionValueSpan.textContent = `${uPrecision}`;
 
     document.getElementById("uPrecision").addEventListener("input", function () {
-        uPrecision =  parseFloat(this.value);
+        uPrecision = parseFloat(this.value);
         uPrecisionValueSpan.textContent = `${uPrecision}`;
         changed = true;
     });
@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
     vPrecisionValueSpan.textContent = `${vPrecision}`;
 
     document.getElementById("vPrecision").addEventListener("input", function () {
-        vPrecision =  parseFloat(this.value);
+        vPrecision = parseFloat(this.value);
         vPrecisionValueSpan.textContent = `${vPrecision}`;
         changed = true;
     });
@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
         changed = true;
     }
 
-    
+
     const gl = canvas.getContext("webgl");
 
     if (!gl) {
@@ -239,7 +239,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 `;
 
-const phongFragmentShaderSource = `
+    const phongFragmentShaderSource = `
 precision mediump float;
 
 uniform vec4 ambientProduct;
@@ -298,9 +298,9 @@ void main() {
         return;
     }
 
-    document.getElementById("wireframeButton").onclick = function(){
+    document.getElementById("wireframeButton").onclick = function () {
 
-        if(shadingMode == PHONG_MODE) {
+        if (shadingMode == PHONG_MODE) {
             vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
         }
@@ -309,7 +309,7 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
-    
+
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
@@ -317,9 +317,9 @@ void main() {
 
         shadingMode = WIREFRAME_MODE
     };
-    document.getElementById("gouraudButton").onclick = function(){
+    document.getElementById("gouraudButton").onclick = function () {
 
-        if(shadingMode == PHONG_MODE) {
+        if (shadingMode == PHONG_MODE) {
             vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
         }
@@ -328,7 +328,7 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
-    
+
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
@@ -336,10 +336,10 @@ void main() {
 
         shadingMode = GOURAUD_MODE
     };
-    document.getElementById("phongButton").onclick = function(){
+    document.getElementById("phongButton").onclick = function () {
 
-        if(shadingMode != PHONG_MODE) {
-            vertexShader =  vertexShader = compileShader(gl.VERTEX_SHADER, phongVertexShaderSource);
+        if (shadingMode != PHONG_MODE) {
+            vertexShader = vertexShader = compileShader(gl.VERTEX_SHADER, phongVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, phongFragmentShaderSource);
         }
 
@@ -347,7 +347,7 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
-    
+
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
@@ -369,44 +369,59 @@ void main() {
 
     function calculateNormals(vertices) {
         var normals = [];
-    
+
         for (var i = 0; i < vertices.length - 2; i += 3) {
             var v0 = vertices[i];
             var v1 = vertices[i + 1];
             var v2 = vertices[i + 2];
-    
+
             var edge1 = subtract(v1, v0);
             var edge2 = subtract(v2, v0);
             var normal = normalize(cross(edge1, edge2));
-    
+
             normals.push(normal, normal, normal);
         }
-    
+
         var averagedNormals = [];
-    
+
         for (var i = 0; i < vertices.length; i++) {
             var normalSum = vec3(0, 0, 0);
-    
+
             // Sum normals from adjacent triangles
             for (var j = 0; j < normals.length; j += 3) {
                 if (Math.floor(i / 3) === Math.floor(j / 3)) {
                     normalSum = add(normalSum, normals[j]);
                 }
             }
-    
+
             // Average and normalize the sum
             var averagedNormal = normalize(normalSum);
             averagedNormals.push(averagedNormal);
         }
-    
+
         return averagedNormals;
     }
-    
+
+    function calculateSurfacePoint(u, v) {
+        const wsqr = 1 - aa * aa;
+        const w = Math.sqrt(wsqr);
+        const denom = aa * (wsqr * Math.cosh(aa * u) ** 2 + aa * Math.sin(w * v) ** 2);
+
+        const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
+        const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
+        const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
+
+        return vec3(x, y, z);
+    }
+
 
     function createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa) {
         // Create an empty array to store the vertices.
         const verticesBreathable1 = [];
         const verticesBreathable2 = [];
+
+        const normalsBreathable1 = [];
+        const normalsBreathable2 = [];
 
         const totalVertices = [];
         const normalVertices = [];
@@ -415,25 +430,44 @@ void main() {
         const sebnormals = [];
         var chose = 1;
 
-        console.log(uPrecision);
-        var errorTest = []
+        var errorTest = [];
 
         for (let u = uRange[0]; u <= uRange[1]; u += uPrecision) {
-            errorTest.push(u);
             for (let v = vRange[0]; v <= vRange[1]; v += vPrecision) {
-                const wsqr = 1 - aa * aa;
-                const w = Math.sqrt(wsqr);
-                const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
+                // const wsqr = 1 - aa * aa;
+                // const w = Math.sqrt(wsqr);
+                // const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
 
-                const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
-                const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
-                const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
+                // const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
+                // const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
+                // const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
+
+                // if (chose % 3 == 1) {
+                //     verticesBreathable1.push(vec4(x, y, z, 1.0));
+                // }
+                // else if (chose % 3 == 2) {
+                //     verticesBreathable2.push(vec4(x, y, z, 1.0));
+                // }
+
+                // Calculate partial derivatives with respect to u and v
+                const deltaU = 0.01; // Small change in u for numerical differentiation
+                const deltaV = 0.01; // Small change in v for numerical differentiation
+                const du = subtract(calculateSurfacePoint(u + deltaU, v), calculateSurfacePoint(u - deltaU, v));
+                const dv = subtract(calculateSurfacePoint(u, v + deltaV), calculateSurfacePoint(u, v - deltaV));
+
+                // Cross product of partial derivatives gives surface normal
+                var normal = vec4();
+                normal = normalize(cross(du, dv));
+                normal[3] = 0.0;
+                errorTest.push(normal);
 
                 if (chose % 3 == 1) {
-                    verticesBreathable1.push(vec4(x, y, z, 1.0));
+                    verticesBreathable1.push(vec4(calculateSurfacePoint(u, v), 1.0));
+                    normalsBreathable1.push(normal);;
                 }
                 else if (chose % 3 == 2) {
-                    verticesBreathable2.push(vec4(x, y, z, 1.0));
+                    verticesBreathable2.push(vec4(calculateSurfacePoint(u, v), 1.0));
+                    normalsBreathable2.push(normal);
                 }
             }
             chose++;
@@ -447,31 +481,14 @@ void main() {
                     var b = verticesBreathable2.shift();
                     totalVertices.push(a);
                     totalVertices.push(b);
+                    var c = normalsBreathable1.shift();
+                    var d = normalsBreathable2.shift();
+                    normalVertices.push(c);
+                    normalVertices.push(d);
                 }
                 chose++;
             }
         }
-
-        function quad(a, b, c, d) {
-            var t1 = subtract(totalVertices[b], totalVertices[a]);
-            var t2 = subtract(totalVertices[c], totalVertices[b]);
-            var normali = cross(t1, t2);
-            var normal = vec3(normali);
-          
-            sebvertices.push(totalVertices[a]);
-            normalVertices.push(normal);
-            sebvertices.push(totalVertices[b]);
-            normalVertices.push(normal);
-            sebvertices.push(totalVertices[c]);
-            normalVertices.push(normal);
-            sebvertices.push(totalVertices[a]);
-            normalVertices.push(normal);
-            sebvertices.push(totalVertices[c]);
-            normalVertices.push(normal);
-            sebvertices.push(totalVertices[d]);
-            normalVertices.push(normal);
-          }
-
 
         for (var i = 0; i < totalVertices.length - 3; i = i + 2) {
 
@@ -483,30 +500,37 @@ void main() {
             sebvertices.push(totalVertices[i + 1]); // b
             sebvertices.push(totalVertices[i + 3]); // d - quad c
 
+            sebnormals.push(normalVertices[i]);
+            sebnormals.push(normalVertices[i+1]);
+            sebnormals.push(normalVertices[i+2]);
+            sebnormals.push(normalVertices[i+2]);
+            sebnormals.push(normalVertices[i+1]);
+            sebnormals.push(normalVertices[i+3]);
 
 
-            var t1 = subtract(totalVertices[i + 1], totalVertices[i]); // b a
-            var t2 = subtract(totalVertices[i + 2], totalVertices[i]); // c a
-            var normal = normalize(cross(t2, t1));
-            normal = vec4(normal);
-            normal[3] = 0.0;
-            // normal = reverseNormal(normal);
 
-            sebnormals.push(normal);
-            sebnormals.push(normal);
-            sebnormals.push(normal);
+            // var t1 = subtract(totalVertices[i + 1], totalVertices[i]); // b a
+            // var t2 = subtract(totalVertices[i + 2], totalVertices[i]); // c a
+            // var normal = normalize(cross(t2, t1));
+            // normal = vec4(normal);
+            // normal[3] = 0.0;
+            // // normal = reverseNormal(normal);
 
-            var t1 = subtract(totalVertices[i + 1], totalVertices[i + 2]); // b a
-            var t2 = subtract(totalVertices[i + 3], totalVertices[i + 2]); // c a
-            var normal = normalize(cross(t2, t1));
-            normal = vec4(normal);
-            normal[3] = 0.0;
-            // normal = reverseNormal(normal);
+            // sebnormals.push(normal);
+            // sebnormals.push(normal);
+            // sebnormals.push(normal);
 
-            sebnormals.push(normal);
-            sebnormals.push(normal);
-            sebnormals.push(normal);
-            
+            // var t1 = subtract(totalVertices[i + 1], totalVertices[i + 2]); // b a
+            // var t2 = subtract(totalVertices[i + 3], totalVertices[i + 2]); // c a
+            // var normal = normalize(cross(t2, t1));
+            // normal = vec4(normal);
+            // normal[3] = 0.0;
+            // // normal = reverseNormal(normal);
+
+            // sebnormals.push(normal);
+            // sebnormals.push(normal);
+            // sebnormals.push(normal);
+
         }
 
 
@@ -586,7 +610,7 @@ void main() {
     gl.uniformMatrix4fv(projectionmatrixLocation, false, flatten(projectionMatrix));
 
     var normalMatrixLocation = gl.getUniformLocation(program, "normalMatrix");
-    
+
     normalMatrix = [
         vec3(modelViewMatrix[0][0], modelViewMatrix[0][1], modelViewMatrix[0][2]),
         vec3(modelViewMatrix[1][0], modelViewMatrix[1][1], modelViewMatrix[1][2]),
@@ -595,14 +619,14 @@ void main() {
 
     gl.uniformMatrix3fv(normalMatrixLocation, false, flatten(normalMatrix));
 
-    var lightPosition = vec4(0.0, 0.0, -60.0, 0.0 );
-    var lightAmbient = vec4(0.1, 0.1, 0.1, 1.0 );
-    var lightDiffuse = vec4( 0.5, 0.5, 0.5, 1.0 );
-    var lightSpecular = vec4( 0.3, 0.3, 0.3, 1.0 );
-    
-    var materialAmbient = vec4( 0.0, 0.0, 1.0, 1.0 );
-    var materialDiffuse = vec4( 0.0, 0.0, 1.0, 1.0 );
-    var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
+    var lightPosition = vec4(0.0, 60.0, 60.0, 0.0);
+    var lightAmbient = vec4(0.4, 0.4, 0.4, 1.0);
+    var lightDiffuse = vec4(0.7, 0.7, 0.7, 1.0);
+    var lightSpecular = vec4(0.2, 0.3, 0.2, 1.0);
+
+    var materialAmbient = vec4(0.0, 0.0, 1.0, 1.0);
+    var materialDiffuse = vec4(0.0, 0.0, 1.0, 1.0);
+    var materialSpecular = vec4(1.0, 1.0, 1.0, 1.0);
     var materialShininess = 4.0;
 
     var ambientProduct = mult(lightAmbient, materialAmbient);
@@ -655,7 +679,7 @@ void main() {
 
         changed = false;
 
-        if(shadingMode == WIREFRAME_MODE) {
+        if (shadingMode == WIREFRAME_MODE) {
             gl.uniform1f(wireframeModeLoc, true);
             gl.drawArrays(gl.LINE_STRIP, 0, vertices.length);
         }
@@ -663,7 +687,7 @@ void main() {
             gl.uniform1f(wireframeModeLoc, false);
             gl.drawArrays(gl.TRIANGLES, 0, vertices.length);
         }
-        
+
 
         requestAnimationFrame(render)
     }
