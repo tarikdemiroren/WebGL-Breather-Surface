@@ -1,6 +1,9 @@
 const WIREFRAME_MODE = 2;
 const GOURAUD_MODE = 0;
 const PHONG_MODE = 1;
+const TEXTURE_MODE = 3;
+
+var tex_url = "https://i.imgur.com/zFZvKPA.png";
 
 document.addEventListener("DOMContentLoaded", function () {
 
@@ -13,6 +16,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // Variables to track the initial mouse position
     let startMouseX = 0;
     let startMouseY = 0;
+
+    let textCoords = [];
 
     // Variables to track the accumulated rotation angles
     let totalRotationX = 0;
@@ -232,8 +237,8 @@ document.addEventListener("DOMContentLoaded", function () {
             L = normalize(light - pos);
         }
 
-        vec3 E = -normalize( pos );
-        vec3 N = normalize( normalMatrix * vNormal.xyz );
+        E = normalize( -pos );
+        N = normalize( normalMatrix * vNormal.xyz );
 
         gl_Position = projectionMatrix * modelViewMatrix * vPosition;
     }
@@ -269,6 +274,127 @@ void main() {
     }
 `;
 
+const textureVertexShaderSource = `
+attribute vec4 vPosition;
+attribute vec4 vNormal;
+
+varying vec4 fColor;
+
+attribute vec2 vTexCoord;
+
+varying highp vec2 fTexCoord;
+
+uniform vec4 ambientProduct, diffuseProduct, specularProduct;
+uniform float shininess;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform vec4 lightPosition;
+uniform mat3 normalMatrix;
+
+
+void main() {
+    vec3 pos = -(modelViewMatrix * vPosition).xyz;
+
+    vec3 L;
+
+    if (lightPosition.w == 0.0){
+        L = normalize(lightPosition.xyz);
+    }
+    else {
+        L = normalize(lightPosition.xyz - pos);
+    }
+
+    vec3 E = normalize( -pos );
+    vec3 H = normalize(L + E);
+    vec3 N = normalize( normalMatrix * vNormal.xyz );
+
+    //float ambientOcclusion = max(dot(N, E), 0.2);
+    vec4 ambient = vec4(0.9, 0.9, 0.9, 1.0); //* ambientOcclusion;
+
+    float Kd = max( dot(L, N), 0.0);
+    vec4 diffuse = Kd * diffuseProduct;
+
+    float Ks = pow( max( dot(N, H), 0.0), shininess);
+    //float Ks = smoothstep(0.0, 1.0, pow(max(dot(N, H), 0.0), shininess));
+    vec4 specular = Ks * specularProduct;
+
+    if ( dot( L , N ) < 0.0 ){
+        specular = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    // specular = vec4(0.7,0.7,0.7,1.0);
+
+    fColor = ambient + diffuse + specular;
+
+    fColor.a = 1.0;
+
+    fTexCoord = vTexCoord;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+}
+`;
+
+const textureFragmentShaderSource = `
+precision mediump float;
+
+varying vec4 fColor;
+uniform bool wireframeMode;
+
+varying highp vec2 fTexCoord;
+uniform sampler2D texture;
+
+void main() {
+    
+    if(wireframeMode == true) {
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+    }
+    else {
+        gl_FragColor = fColor * texture2D(texture, fTexCoord);;
+    }
+    
+}
+`;
+
+function configureTexture()
+{
+    texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    var textureInfo =
+    {
+        width: 1,
+        height: 1,
+        texture: texture,
+    };
+
+    var img = new Image();
+    img.addEventListener('load', function()
+    {
+        textureInfo.width = img.width;
+        textureInfo.height = img.height;
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    });
+
+    requestCORSIfNotSameOrigin(img, tex_url);
+    img.src = tex_url;
+}
+
+function requestCORSIfNotSameOrigin(img, tex_url)
+{
+    if ((new URL(tex_url)).origin !== window.location.origin)
+    {
+        img.crossOrigin = "";
+    }
+}
+
     // Compile shaders
     function compileShader(type, source) {
         const shader = gl.createShader(type);
@@ -300,7 +426,7 @@ void main() {
 
     document.getElementById("wireframeButton").onclick = function () {
 
-        if (shadingMode == PHONG_MODE) {
+        if (shadingMode == PHONG_MODE || TEXTURE_MODE) {
             vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
         }
@@ -309,17 +435,19 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        gl.useProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
         }
 
-        shadingMode = WIREFRAME_MODE
+        shadingMode = WIREFRAME_MODE;
+        changed = true;
     };
     document.getElementById("gouraudButton").onclick = function () {
 
-        if (shadingMode == PHONG_MODE) {
+        if (shadingMode == PHONG_MODE || TEXTURE_MODE) {
             vertexShader = compileShader(gl.VERTEX_SHADER, gouraudVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, gouraudFragmentShaderSource);
         }
@@ -328,18 +456,20 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        gl.useProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
         }
 
-        shadingMode = GOURAUD_MODE
+        shadingMode = GOURAUD_MODE;
+        changed = true;
     };
     document.getElementById("phongButton").onclick = function () {
 
         if (shadingMode != PHONG_MODE) {
-            vertexShader = vertexShader = compileShader(gl.VERTEX_SHADER, phongVertexShaderSource);
+            vertexShader = compileShader(gl.VERTEX_SHADER, phongVertexShaderSource);
             fragmentShader = compileShader(gl.FRAGMENT_SHADER, phongFragmentShaderSource);
         }
 
@@ -347,19 +477,41 @@ void main() {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        gl.useProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
             return;
         }
 
-        shadingMode = PHONG_MODE
+        shadingMode = PHONG_MODE;
+        changed = true;
+    };
+
+    document.getElementById("textureButton").onclick = function () {
+
+        if (shadingMode != TEXTURE_MODE) {
+            vertexShader  = compileShader(gl.VERTEX_SHADER, textureVertexShaderSource);
+            fragmentShader = compileShader(gl.FRAGMENT_SHADER, textureFragmentShaderSource);
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        gl.useProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(`Program linking error: ${gl.getProgramInfoLog(program)}`);
+            return;
+        }
+
+        shadingMode = TEXTURE_MODE;
+        changed = true;
     };
 
 
     gl.enable(gl.DEPTH_TEST);
-
-
 
     gl.useProgram(program);
 
@@ -429,27 +581,14 @@ void main() {
         const normalVertices = [];
 
         const sebvertices = [];
+        const sebText = [];
         const sebnormals = [];
         var chose = 1;
 
-        var errorTest = [];
-
         for (let u = uRange[0]; u <= uRange[1]; u += uPrecision) {
             for (let v = vRange[0]; v <= vRange[1]; v += vPrecision) {
-                // const wsqr = 1 - aa * aa;
-                // const w = Math.sqrt(wsqr);
-                // const denom = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
 
-                // const x = -u + (2 * wsqr * Math.cosh(aa * u) * Math.sinh(aa * u) / denom);
-                // const y = 2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - (Math.sin(v) * Math.sin(w * v))) / denom;
-                // const z = 2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + (Math.cos(v) * Math.sin(w * v))) / denom;
-
-                // if (chose % 3 == 1) {
-                //     verticesBreathable1.push(vec4(x, y, z, 1.0));
-                // }
-                // else if (chose % 3 == 2) {
-                //     verticesBreathable2.push(vec4(x, y, z, 1.0));
-                // }
+                sebText.push(vec2((u-uRange[0]) / (uRange[1] - uRange[0]), (v-vRange[0]) / (vRange[1] - vRange[0])));
 
                 // Calculate partial derivatives with respect to u and v
                 const deltaU = 0.01; // Small change in u for numerical differentiation
@@ -461,7 +600,6 @@ void main() {
                 var normal = vec4();
                 normal = normalize(cross(du, dv));
                 normal[3] = 0.0;
-                errorTest.push(normal);
 
                 if (chose % 3 == 1) {
                     verticesBreathable1.push(vec4(calculateSurfacePoint(u, v), 1.0));
@@ -502,74 +640,26 @@ void main() {
             sebvertices.push(totalVertices[i + 1]); // b
             sebvertices.push(totalVertices[i + 3]); // d - quad c
 
+            textCoords.push(sebText[i]);
+            textCoords.push(sebText[i + 1]); // b
+            textCoords.push(sebText[i + 2]); // c - quad d
+            textCoords.push(sebText[i + 2]); // c - quad d
+            textCoords.push(sebText[i + 1]); // b
+            textCoords.push(sebText[i + 3]);
+
             sebnormals.push(normalVertices[i]);
             sebnormals.push(normalVertices[i+1]);
             sebnormals.push(normalVertices[i+2]);
             sebnormals.push(normalVertices[i+2]);
             sebnormals.push(normalVertices[i+1]);
             sebnormals.push(normalVertices[i+3]);
-
-
-
-            // var t1 = subtract(totalVertices[i + 1], totalVertices[i]); // b a
-            // var t2 = subtract(totalVertices[i + 2], totalVertices[i]); // c a
-            // var normal = normalize(cross(t2, t1));
-            // normal = vec4(normal);
-            // normal[3] = 0.0;
-            // // normal = reverseNormal(normal);
-
-            // sebnormals.push(normal);
-            // sebnormals.push(normal);
-            // sebnormals.push(normal);
-
-            // var t1 = subtract(totalVertices[i + 1], totalVertices[i + 2]); // b a
-            // var t2 = subtract(totalVertices[i + 3], totalVertices[i + 2]); // c a
-            // var normal = normalize(cross(t2, t1));
-            // normal = vec4(normal);
-            // normal[3] = 0.0;
-            // // normal = reverseNormal(normal);
-
-            // sebnormals.push(normal);
-            // sebnormals.push(normal);
-            // sebnormals.push(normal);
-
         }
 
-
-        //length_of_strip = undefined;
-
-        // chose = 0;
-
-        // for (var i = 0; i < totalVertices.length - 2; i++) {
-        //     var t1 = subtract(totalVertices[i + 1], totalVertices[i]);
-        //     var t2 = subtract(totalVertices[i + 2], totalVertices[i]);
-        //     var normal = normalize(cross(t2, t1));
-
-        //     normal = vec4(normal);
-        //     normal[3] = 0.0;
-
-        //     if (i % (length_of_strip) == 0){
-        //         chose = 0;
-        //     }
-
-        //     if (chose % 2 == 0){
-        //         normal = reverseNormal(normal);
-        //     }
-        //     chose++;
-
-        //     normalVertices.push(normal);
-        //     normalVertices.push(normal);
-        //     normalVertices.push(normal);
-
-        //     // normalVertices.push(totalVertices[i][0], totalVertices[i][1], totalVertices[i][2], 0.0 );
-        //     // normalVertices.push(totalVertices[i+1][0], totalVertices[i+1][1], totalVertices[i+1][2], 0.0 );
-        //     // normalVertices.push(totalVertices[i+2][0], totalVertices[i+2][1], totalVertices[i+2][2], 0.0 );
-        // }
-
         normalsArray = (sebnormals);
-
+        // console.log("huba");
         // console.log(normalsArray);
-        console.log(errorTest);
+
+        // console.log(errorTest);
 
 
         return sebvertices;
@@ -577,20 +667,37 @@ void main() {
 
     let vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
 
+    if (shadingMode == TEXTURE_MODE){
+        // let textCoords = structuredClone(vertices);
+
+        const textureBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, flatten(textCoords), gl.STATIC_DRAW);
+
+        let vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+        gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(vTexCoord);
+        configureTexture();
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
+    }
+
     // Create buffer and set vertices based on the parametrization
-    const positionBuffer = gl.createBuffer();
+    let positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
 
-    const positionAttribLocation = gl.getAttribLocation(program, "vPosition");
+    let positionAttribLocation = gl.getAttribLocation(program, "vPosition");
     gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(positionAttribLocation);
 
-    const nBuffer = gl.createBuffer();
+    let nBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, flatten(normalsArray), gl.STATIC_DRAW);
 
-    const vNormal = gl.getAttribLocation(program, "vNormal");
+    let vNormal = gl.getAttribLocation(program, "vNormal");
     gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(vNormal);
 
@@ -660,10 +767,57 @@ void main() {
 
         if (changed) {
             vertices = createBreatherSurfaceVertices(uRange, vRange, uPrecision, vPrecision, aa);
+
             gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, flatten(vertices), gl.STATIC_DRAW);
+
+            positionAttribLocation = gl.getAttribLocation(program, "vPosition");
+            gl.vertexAttribPointer(positionAttribLocation, 4, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(positionAttribLocation);
+
             gl.bindBuffer(gl.ARRAY_BUFFER, nBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, flatten(normalsArray), gl.STATIC_DRAW);
+
+            vNormal = gl.getAttribLocation(program, "vNormal");
+            gl.vertexAttribPointer(vNormal, 4, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(vNormal);
+            
+            if (shadingMode == TEXTURE_MODE){
+
+                let textCoords = structuredClone(vertices);
+                const textureBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, flatten(textCoords), gl.STATIC_DRAW);
+                let vTexCoord = gl.getAttribLocation(program, "vTexCoord");
+                gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 0, 0);
+                gl.enableVertexAttribArray(vTexCoord);
+                configureTexture();
+        
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.uniform1i(gl.getUniformLocation(program, "texture"), 0);
+            }
+
+            var normalMatrixLocation = gl.getUniformLocation(program, "normalMatrix");
+
+            gl.uniformMatrix3fv(normalMatrixLocation, false, flatten(normalMatrix));
+
+            var ambientProduct = mult(lightAmbient, materialAmbient);
+            var diffuseProduct = mult(lightDiffuse, materialDiffuse);
+            var specularProduct = mult(lightSpecular, materialSpecular);
+        
+            var lightPositionLoc = gl.getUniformLocation(program, "lightPosition");
+            var ambientColorLoc = gl.getUniformLocation(program, "ambientProduct");
+            var diffuseColorLoc = gl.getUniformLocation(program, "diffuseProduct");
+            var specularColorLoc = gl.getUniformLocation(program, "specularProduct");
+            var shininessLoc = gl.getUniformLocation(program, "shininess");
+            var wireframeModeLoc = gl.getUniformLocation(program, "wireframeMode");
+        
+            gl.uniform4fv(lightPositionLoc, flatten(lightPosition));
+            gl.uniform4fv(ambientColorLoc, flatten(ambientProduct));
+            gl.uniform4fv(diffuseColorLoc, flatten(diffuseProduct));
+            gl.uniform4fv(specularColorLoc, flatten(specularProduct));
+            gl.uniform1f(shininessLoc, materialShininess);
         }
 
         // modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationX * (Math.PI / 180), [1, 0, 0]));
@@ -671,13 +825,13 @@ void main() {
         modelViewMatrix[2][3] = -(zoomFactor);
         modelViewMatrix = mult(modelViewMatrix, rotate(totalRotationY * (Math.PI / 180), [0, 1, 0]));
 
-        //var modelviewmatrixLocation = gl.getUniformLocation(program, "modelViewMatrix");
+        modelviewmatrixLocation = gl.getUniformLocation(program, "modelViewMatrix");
 
         gl.uniformMatrix4fv(modelviewmatrixLocation, false, flatten(modelViewMatrix));
 
-        // var projectionmatrixLocation = gl.getUniformLocation(program, "projectionMatrix");
+        var projectionmatrixLocation = gl.getUniformLocation(program, "projectionMatrix");
 
-        // gl.uniformMatrix4fv(projectionmatrixLocation, false, flatten(projectionMatrix));
+        gl.uniformMatrix4fv(projectionmatrixLocation, false, flatten(projectionMatrix));
 
         changed = false;
 
